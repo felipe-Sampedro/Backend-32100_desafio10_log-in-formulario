@@ -89,7 +89,7 @@ app.get("/", async (req, res) => {
         });
       });
   
-      sqliteDB.createTableMessage("mensajes");
+      sqliteDB.createTableMessagges("mensajes");
   
       sqliteDB
         .getMessages("mensajes")

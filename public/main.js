@@ -5,6 +5,7 @@ const prodForm = document.getElementById("productsForm")
 const nameInput = document.getElementById("nombre");
 const priceInput = document.getElementById("precio");
 const imageInput = document.getElementById("imagen");
+const headerForm = document.getElementById("userHeader");
 const mens = document.getElementById('mens');
 const messagesForm = document.getElementById('formMessages');
 const emailImput = document.getElementById('email');

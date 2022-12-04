@@ -6,7 +6,7 @@ module.exports = class SQLClient {
     }
 
 
-    createTableProducts(tableName){
+    creatTable(tableName){
         return this.knex.schema.hasTable(tableName)
             .then((response)=>{
                 if(!response){
@@ -37,9 +37,10 @@ module.exports = class SQLClient {
         }).catch((err) => console.log("error en constructor mensajes", err));    
     }
 
+
     insertRecords(tableName,items){
         return this.knex(tableName).insert(items)
-        .then(console.log('item inserted succesfully'));
+        .then(()=>console.log('item inserted succesfully'));
     }
 
 
@@ -51,6 +52,7 @@ module.exports = class SQLClient {
             'imagen',
         );
     }
+
 
     deleteById(tableName, id){
         return this.knex.from(tableName).where({id}).del()
@@ -71,7 +73,8 @@ module.exports = class SQLClient {
 
 
     disconnect(){
-        this.knex.distroy()
+        this.knex.destroy()
     }
 
 }
+
