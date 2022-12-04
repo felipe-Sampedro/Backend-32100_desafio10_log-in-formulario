@@ -1,0 +1,20 @@
+[
+    {
+      "name": "sujeto1",
+      "lastname": "apellido1",
+      "email": "1@gmail.com"  
+      
+    },
+    {
+      "name": "sujeto2",
+      "lastname": "apellido2",
+      "email": "2@gmail.com"    
+    },
+    {
+      "name": "sujeto3",
+      "lastname": "apellido3",
+      "email": "3@gmail.com"
+     
+    }
+  ]
+  

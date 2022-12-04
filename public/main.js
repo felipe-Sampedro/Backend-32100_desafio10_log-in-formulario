@@ -1,7 +1,5 @@
-// const SQLClients = require('../db/clients/sql.clients')
-// const dbConfig = require('./db/config')
-// const mariaDB = new SQLClients(dbConfig.mariaDB)
 const socket = io()
+
 const prod = document.getElementById("productos");
 const prodForm = document.getElementById("productsForm")
 const nameInput = document.getElementById("nombre");
@@ -29,9 +27,18 @@ prodForm.addEventListener("submit", (event) =>{
     imageInput.value ="";    
 })
 
+socket.on("header",(nameUser)=>{
+    console.log(nameUser);
+    fetch('header.hbs')
+    .then((data) =>data.text())
+        .then((serverTemplate) =>{                        
+            const template = Handlebars.compile(serverTemplate);
+            const html = template({nameUser});
+            headerForm.innerHTML = html;
+        })  
+})
 
 socket.on('products', (products) => {
-    console.log(products);
      fetch('list.hbs').then((data) =>data.text())
         .then((s_Template) =>{
             const template = Handlebars.compile(s_Template);

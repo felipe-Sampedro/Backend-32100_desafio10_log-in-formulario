@@ -1,77 +1,163 @@
 const express = require("express");
+const session = require('express-session')
+const MongoStore = require("connect-mongo");
+const auth = require("./middlewares/auth");
+const users = require("./db/data/users.json");
 const { Server: HttpServer } = require("http")
 const { Server: SocketServer } = require("socket.io") 
+const { formatMessage } = require("./utils/utils");
 const SQLClient = require('./db/clients/sql.clients')
 const dbConfig = require('./db/config')
-const Products = require('./model/products')
-const { formatMessage } = require("./utils/utils");
+const console = require("console");
+const handlebars = require('express-handlebars')
 
-const app = express()
+const app = express();
 const PORT = process.env.PORT || 8080
-const httpServer = new HttpServer(app)
-const io = new SocketServer(httpServer)
-const mariaDB = new SQLClient(dbConfig.mariaDB)
+const httpServer = new HttpServer(app);
+const io = new SocketServer(httpServer);
+const mariaDB = new SQLClient(dbConfig.mariaDB);
 const sqliteDB = new SQLClient(dbConfig.sqlite);
 
-const productos = new Products()
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use(express.static('public'));
+app.use(express.static('./public'));
+app.use(
+    session({
+      name: "my-session",
+      secret: "top-secret-51",
+      resave: false,
+      saveUninitialized: false,
+      rolling: true, //recarga maxEdge
+      store: MongoStore.create({
+        mongoUrl:
+        `mongodb+srv://coderhouse:coder123house456@cluster0.zhv02a9.mongodb.net/sessions?retryWrites=true&w=majority`,
+      }),
+      cookie: {maxAge: 60000} //1 minuto
+    })
+  );
+app.engine(
+"hbs",
+handlebars({
+    extname: ".hbs", 
+    defaultLayout: '../logoutUser.hbs',     
+})
+);
+app.set("view engine", "hbs");
+app.set("views", "./public");
+  
+//Listen
+httpServer.listen(PORT, ()=> {
+    console.log("Ready an running on port", PORT);
+})
 
+const usersSocket =[]
 
-httpServer.listen(PORT, ()=>console.log("Ready an running on port", PORT))
-
-// const messages =[]
-const users =[]
-
-
-// Socket Events
-
-io.on('connection',(socket) =>{
-    console.log("A New Client Conection");
-    console.log(socket.id);
-
-    // socket.emit('products', productos.getAll());
-    mariaDB.createTableProducts("productos")
-    .then(console.log('table created'));
-
-    mariaDB.getRecords("productos")
-        .then((data) =>{socket.emit('products',data)})
-    
-
-    socket.on('newProduct', (newProduct) =>{
-        mariaDB.insertRecords("productos", newProduct);
-        mariaDB.getRecords("productos")
-        .then(data =>{            
-            socket.emit('products',data)});       
-    });       
-
-
-    // io.emit("message", [...messages]);
-    sqliteDB.createTableMessagges("mensajes")
-    .then(console.log('table messages created'));;
-
-    sqliteDB.getMessages("mensajes")
-        .then((data) => io.emit('message', data));
-
-    socket.on('newUser', (username) =>{
-        const newUser = {
-            id: socket.id,
-            username: username,
-        }
-        users.push(newUser);
-    });
-
-    socket.on("newMessage", (data) =>{
-        const user = users.find(user => user.id === socket.id);
-        console.log('nombre de usuario' + user.username);
-        const newMessage = formatMessage(user.username,data);
-        sqliteDB.insertRecords('mensajes', newMessage)
-        console.log(user.username);
-        io.emit('chatMessage', newMessage);
-    });
+app.get("/", async (req, res) => {
+    const user = await req.session.user;
+    console.log(user);
+    if (user) {
+        return res.redirect("/form.html");
+    } else {
+        return res.redirect("/login.html");
+    }
 });
+
+
+  app.get("/form", auth, async (req, res) => {
+    const userData = await req.session.user;
+    res.redirect("/form.html");
+  
+    io.on("connection", async (socket) => {
+      console.log("New Client Conection");
+      console.log(socket.id);
+  
+      let username = userData.name;
+      socket.emit("header", username); 
+      socket.emit("logoutUser", username);    
+  
+      mariaDB.creatTable("productos");
+  
+      mariaDB.getRecords("productos").then((data) => {
+        socket.emit("products", data);
+      });
+  
+      socket.on("newProduct", (newProduct) => {
+        mariaDB.insertRecords("productos", newProduct);
+        mariaDB.getRecords("productos").then((data) => {
+          socket.emit("products", data);
+        });
+      });
+  
+      sqliteDB.createTableMessage("mensajes");
+  
+      sqliteDB
+        .getMessages("mensajes")
+        .then((data) => socket.emit("message", data));
+  
+      socket.on("newUser", (username) => {
+        const newUser = {
+          id: socket.id,
+          username: username,
+        };
+        users.push(newUser);
+      });
+  
+      socket.on("newMessage", (data) => {
+        const user = usersSocket.find((user) => user.id === socket.id);
+        const newMessage = formatMessage(user.username, data);
+        console.log("socket newMessage");
+        sqliteDB.insertRecords("mensajes", newMessage);
+        //messages.push(newMessage);
+        io.emit("chatMessage", newMessage);
+      });
+      socket.on("disconnect", () => {
+        io.emit("userDisconnected", `${socket.id}`);
+      });
+    });
+  
+    //res.render("header", {sessionUser: user});
+  });
+
+  app.get("/logout", auth, async (req, res) => {  
+    const nameUser = await req.session.user.name;
+    try {
+      req.session.destroy((err) => {
+        if (err) {
+          console.log(err);
+          res.clearCookie("my-session");
+        } else {                     
+          res.render('logoutUser', {nameUser});  
+          res.clearCookie("my-session");      
+        }
+      });
+    } catch (err) {
+      console.log(err);
+    }
+  });
+
+  app.get("/error", (req, res) => {
+    res.status(500).redirect("error.html");
+  });
+  
+  app.get("/unauthorized", (req, res) => {
+    res.status(401).sendFile(__dirname + "/public/unauthorized.html");
+  });
+  
+  app.post("/login", (req, res) => {
+    const { email, password } = req.body;
+    const user = users.find((user) => user.email === email);
+    if (!user) return res.redirect("/error");
+    req.session.user = user;
+    req.session.save((err) => {
+      if (err) {
+        console.log("Sesion error=>", err);
+        return res.redirect("/error");
+      }
+      res.redirect("/form");
+    });
+  });
+  
 
 
 
