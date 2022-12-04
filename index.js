@@ -100,7 +100,7 @@ app.get("/", async (req, res) => {
           id: socket.id,
           username: username,
         };
-        users.push(newUser);
+        usersSocket.push(newUser);
       });
   
       socket.on("newMessage", (data) => {
